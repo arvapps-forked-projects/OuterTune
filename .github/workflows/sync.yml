@@ -1,0 +1,33 @@
+name: Sync Fork
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get parent info
+        id: parent
+        run: |
+          PARENT=$(gh api repos/${{ github.repository }} --jq '.parent.full_name')
+          PARENT_BRANCH=$(gh api repos/${{ github.repository }} --jq '.parent.default_branch')
+          echo "parent=$PARENT" >> "$GITHUB_OUTPUT"
+          echo "branch=$PARENT_BRANCH" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync from upstream
+        run: |
+          git remote add upstream "https://github.com/${{ steps.parent.outputs.parent }}.git"
+          git fetch upstream
+          git reset --hard "upstream/${{ steps.parent.outputs.branch }}"
+          git push --force origin HEAD:${{ steps.parent.outputs.branch }}
